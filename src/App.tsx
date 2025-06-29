@@ -26,9 +26,23 @@ function HomePage() {
 
   const handleSubmitUrl = async (url: string) => {
     await fetchRepository(url);
-    // Navigate to the repository-specific URL
-    const encodedUrl = encodeURIComponent(url);
-    navigate(`/${encodedUrl}`);
+    // Navigate to the repository-specific URL using owner/repo format
+    const repoInfo = extractRepoInfo(url);
+    if (repoInfo) {
+      navigate(`/${repoInfo.owner}/${repoInfo.repo}`);
+    }
+  };
+
+  const extractRepoInfo = (url: string): { owner: string; repo: string } | null => {
+    const githubRegex = /github\.com\/([^\/]+)\/([^\/]+)/;
+    const match = url.match(githubRegex);
+    
+    if (!match) return null;
+    
+    return {
+      owner: match[1],
+      repo: match[2].replace(/\.git$/, '')
+    };
   };
 
   const handleGenerateReadme = async (email: string) => {
@@ -139,7 +153,7 @@ function HomePage() {
 }
 
 function RepositoryPage() {
-  const { url } = useParams<{ url: string }>();
+  const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const navigate = useNavigate();
   
   const {
@@ -156,11 +170,13 @@ function RepositoryPage() {
   } = useReadmeGenerator();
 
   useEffect(() => {
-    if (url) {
-      const decodedUrl = decodeURIComponent(url);
-      fetchRepository(decodedUrl);
+    if (owner && repo) {
+      // Clean up repo name (remove .git extension if present)
+      const cleanRepo = repo.replace(/\.git$/, '');
+      const githubUrl = `https://github.com/${owner}/${cleanRepo}`;
+      fetchRepository(githubUrl);
     }
-  }, [url, fetchRepository]);
+  }, [owner, repo, fetchRepository]);
 
   const handleGenerateReadme = async (email: string) => {
     const apiKey = localStorage.getItem('gemini-api-key');
@@ -298,7 +314,7 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/:url" element={<RepositoryPage />} />
+      <Route path="/:owner/:repo" element={<RepositoryPage />} />
     </Routes>
   );
 }
